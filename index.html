@@ -590,7 +590,7 @@
             <h2 class="main-title" style="font-size: 2rem;"><i class="fa fa-trophy" style="color:var(--gold);"></i> Top Players</h2>
             <div class="table-container">
                 <table class="data-table">
-                    <thead><tr><th>Player Name</th><th>Total Wins</th></tr></thead>
+                    <thead><tr><th>Player</th><th style="text-align:center">W</th><th style="text-align:center">D</th><th style="text-align:center">L</th></tr></thead>
                     <tbody id="leaderboard-tbody"></tbody>
                 </table>
             </div>
@@ -676,7 +676,7 @@
 
     <script>
         /** ==========================================
-         *  FIREBASE SETUP — with retry + status indicator
+         *  FIREBASE SETUP — Robust connection
          *  ========================================== */
         const firebaseConfig = {
             apiKey: "AIzaSyBPMgZn7nLtx0E_wGdTqmiCDxOrRoWDhRM",
@@ -686,7 +686,7 @@
             messagingSenderId: "941160028700",
             appId: "1:941160028700:web:77471156313f6e59bb1dd9"
         };
-        
+
         let db = null;
 
         function setFbStatus(state) {
@@ -699,92 +699,147 @@
             else { text.textContent = 'DB...'; }
         }
 
-        async function initFirebase() {
+        function initFirebase() {
             try {
-                // Avoid double-init if already initialized
                 if (!firebase.apps.length) {
                     firebase.initializeApp(firebaseConfig);
                 }
                 db = firebase.firestore();
-                // Enable offline persistence so it works even with spotty connection
-                await db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
-                // Quick ping to verify connection
-                await db.collection('_ping').doc('test').set({ ts: Date.now() });
-                setFbStatus('ok');
+                // Test connectivity with a simple read (no index or write permissions needed)
+                db.collection('matches').limit(1).get()
+                    .then(() => setFbStatus('ok'))
+                    .catch(() => setFbStatus('err'));
             } catch(e) {
-                console.warn('Firebase connection issue:', e.message);
-                // Still keep db reference — Firestore will queue writes offline
-                if (!firebase.apps.length) {
-                    try { firebase.initializeApp(firebaseConfig); } catch(_) {}
-                }
-                try { db = firebase.firestore(); } catch(_) {}
-                setFbStatus(db ? 'ok' : 'err');
+                console.error('Firebase init failed:', e);
+                setFbStatus('err');
             }
         }
         initFirebase();
 
-        async function saveMatch(winnerName, loserName) {
-            if (!db || gameMode === 'pva') return;
+        /** Save a completed match to Firestore
+         *  Works for both PvP and PvA modes now */
+        async function saveMatch(winnerName, loserName, mode) {
+            if (!db) return;
             try {
                 await db.collection("matches").add({
                     player1: document.querySelector('#card-w .player-name').textContent,
                     player2: document.querySelector('#card-b .player-name').textContent,
                     winner: winnerName,
                     loser: loserName,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    mode: mode || gameMode,        // 'pvp' or 'pva'
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    ts: Date.now()                 // fallback timestamp for sorting
                 });
                 setFbStatus('ok');
             } catch(e) {
-                console.error("Database save error", e);
+                console.error("Database save error:", e);
                 setFbStatus('err');
             }
         }
 
+        /** ==========================================
+         *  HISTORY MODAL
+         *  ========================================== */
         async function openHistory() {
             document.getElementById('history-modal').classList.add('active');
             const tbody = document.getElementById('history-tbody');
-            tbody.innerHTML = '<tr><td colspan="5">Loading...</td></tr>';
-            if (!db) { tbody.innerHTML = '<tr><td colspan="5">Database not connected</td></tr>'; return; }
-            
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--gold-dim)"><i class="fa fa-spinner fa-spin"></i> Loading...</td></tr>';
+
+            if (!db) {
+                tbody.innerHTML = '<tr><td colspan="5" style="color:var(--red);text-align:center">⚠ Database not connected</td></tr>';
+                return;
+            }
+
             try {
-                const snap = await db.collection("matches").orderBy('createdAt', 'desc').limit(20).get();
+                // Use ts (numeric) for sorting — avoids needing a Firestore composite index
+                const snap = await db.collection("matches").orderBy('ts', 'desc').limit(30).get();
+                if (snap.empty) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-dim)">No matches recorded yet. Finish a PvP game to see history!</td></tr>';
+                    return;
+                }
                 tbody.innerHTML = snap.docs.map(d => {
                     const data = d.data();
-                    const dt = data.createdAt ? data.createdAt.toDate().toLocaleString() : 'Just now';
-                    return `<tr><td>${data.player1}</td><td>${data.player2}</td><td style="color:var(--gold)">${data.winner}</td><td style="color:var(--red)">${data.loser}</td><td>${dt}</td></tr>`;
-                }).join('') || '<tr><td colspan="5">No matches played yet.</td></tr>';
+                    const dt = data.createdAt
+                        ? data.createdAt.toDate().toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })
+                        : (data.ts ? new Date(data.ts).toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) : '—');
+                    const modeTag = data.mode === 'pva'
+                        ? '<span style="font-size:0.75rem;color:var(--gold-dim);margin-left:4px">[vs AI]</span>'
+                        : '';
+                    return `<tr>
+                        <td>${data.player1 || '?'}${data.mode==='pva' ? modeTag : ''}</td>
+                        <td>${data.player2 || '?'}</td>
+                        <td style="color:var(--gold);font-weight:700">${data.winner || '—'}</td>
+                        <td style="color:var(--red)">${data.loser || '—'}</td>
+                        <td style="color:var(--text-dim);font-size:0.85rem">${dt}</td>
+                    </tr>`;
+                }).join('');
             } catch(e) {
-                tbody.innerHTML = '<tr><td colspan="5">Failed to load history</td></tr>';
+                console.error('History load error:', e);
+                tbody.innerHTML = `<tr><td colspan="5" style="color:var(--red);text-align:center">⚠ Failed to load: ${e.message}</td></tr>`;
+                setFbStatus('err');
             }
         }
 
+        /** ==========================================
+         *  LEADERBOARD + STATS MODAL
+         *  ========================================== */
         async function openLeaderboard() {
             document.getElementById('leaderboard-modal').classList.add('active');
             const tbody = document.getElementById('leaderboard-tbody');
-            tbody.innerHTML = '<tr><td colspan="2">Loading...</td></tr>';
-            if (!db) { tbody.innerHTML = '<tr><td colspan="2">Database not connected</td></tr>'; return; }
-            
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--gold-dim)"><i class="fa fa-spinner fa-spin"></i> Loading...</td></tr>';
+
+            if (!db) {
+                tbody.innerHTML = '<tr><td colspan="4" style="color:var(--red);text-align:center">⚠ Database not connected</td></tr>';
+                return;
+            }
+
             try {
                 const snap = await db.collection("matches").get();
-                let winsMap = {};
+                // stats[player] = { wins, losses, draws }
+                const stats = {};
+
                 snap.forEach(d => {
                     const data = d.data();
-                    const w = data.winner;
-                    const p1 = data.player1 || '';
-                    const p2 = data.player2 || '';
-                    
-                    // Exclude any games played against the AI from competitive stats
-                    const isAiGame = p1.startsWith('AI') || p2.startsWith('AI');
+                    if (!data.player1 || !data.player2) return;
 
-                    if (w && w !== "Draw" && !isAiGame) {
-                        winsMap[w] = (winsMap[w] || 0) + 1;
+                    // Include all human players — skip AI entries themselves
+                    const players = [];
+                    if (!data.player1.startsWith('AI')) players.push(data.player1);
+                    if (!data.player2.startsWith('AI')) players.push(data.player2);
+
+                    players.forEach(p => {
+                        if (!stats[p]) stats[p] = { wins: 0, losses: 0, draws: 0 };
+                    });
+
+                    if (data.winner === 'Draw') {
+                        players.forEach(p => stats[p].draws++);
+                    } else {
+                        if (stats[data.winner])  stats[data.winner].wins++;
+                        if (stats[data.loser])   stats[data.loser].losses++;
                     }
                 });
-                
-                const sorted = Object.entries(winsMap).sort((a,b) => b[1] - a[1]);
-                tbody.innerHTML = sorted.map((s,i) => `<tr><td>${i+1}. ${s[0]}</td><td style="color:var(--gold);font-weight:bold;">${s[1]}</td></tr>`).join('') || '<tr><td colspan="2">Play a Human vs Human match to rank up!</td></tr>';
+
+                const entries = Object.entries(stats)
+                    .map(([name, s]) => ({ name, ...s, score: s.wins * 3 + s.draws }))
+                    .sort((a, b) => b.score - a.score || b.wins - a.wins);
+
+                if (entries.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-dim)">No player data yet. Complete a match first!</td></tr>';
+                    return;
+                }
+
+                const medals = ['🥇','🥈','🥉'];
+                tbody.innerHTML = entries.map((e, i) => `
+                    <tr>
+                        <td style="font-weight:700">${medals[i] || (i+1+'.')} ${e.name}</td>
+                        <td style="color:var(--gold);font-weight:700;text-align:center">${e.wins}</td>
+                        <td style="color:var(--text-dim);text-align:center">${e.draws}</td>
+                        <td style="color:var(--red);text-align:center">${e.losses}</td>
+                    </tr>`).join('');
             } catch(e) {
-                tbody.innerHTML = '<tr><td colspan="2">Failed to load leaderboard</td></tr>';
+                console.error('Leaderboard load error:', e);
+                tbody.innerHTML = `<tr><td colspan="4" style="color:var(--red);text-align:center">⚠ Failed to load: ${e.message}</td></tr>`;
+                setFbStatus('err');
             }
         }
 
@@ -1040,12 +1095,12 @@
                 st.style.color = 'var(--gold)';
                 cw.classList.remove('active'); cb.classList.remove('active');
 
-                if (!gameOverSaved) { saveMatch(winnerName, loserName); gameOverSaved = true; }
+                if (!gameOverSaved) { saveMatch(winnerName, loserName, gameMode); gameOverSaved = true; }
             } else if (game.in_draw() || game.in_stalemate() || game.in_threefold_repetition()) {
                 st.innerHTML = `<i class="fa fa-handshake"></i> Game Drawn.`;
                 st.style.color = 'var(--cream-dim)';
                 cw.classList.remove('active'); cb.classList.remove('active');
-                if (!gameOverSaved) { saveMatch("Draw", "Draw"); gameOverSaved = true; }
+                if (!gameOverSaved) { saveMatch("Draw", "Draw", gameMode); gameOverSaved = true; }
             } else {
                 st.innerHTML = `${game.in_check() ? '<span style="color:var(--red)">Check!</span>' : 'Match in progress'}`;
             }
