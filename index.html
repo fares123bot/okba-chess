@@ -496,6 +496,138 @@
 
         .hidden { display: none !important; }
 
+        /* === VICTORY MODAL === */
+        #victory-modal .modal-content {
+            width: 480px;
+            padding: 50px 40px 40px;
+            background: linear-gradient(160deg, #1a1e2a 0%, #12151e 100%);
+            border: 1px solid var(--gold);
+            box-shadow: 0 0 60px rgba(201,168,76,0.25), 0 30px 80px rgba(0,0,0,0.95), inset 0 1px 0 rgba(201,168,76,0.2);
+            overflow: hidden;
+        }
+
+        #victory-confetti {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            border-radius: 20px;
+        }
+
+        @keyframes crownBounce {
+            0%   { transform: translateY(0) scale(1)     rotate(-5deg); }
+            30%  { transform: translateY(-18px) scale(1.15) rotate(3deg);  }
+            55%  { transform: translateY(-8px) scale(1.05)  rotate(-2deg); }
+            75%  { transform: translateY(-14px) scale(1.1) rotate(2deg);  }
+            100% { transform: translateY(0) scale(1)     rotate(0deg);   }
+        }
+        @keyframes goldGlow {
+            0%, 100% { text-shadow: 0 0 20px rgba(201,168,76,0.5), 0 0 40px rgba(201,168,76,0.2); }
+            50%       { text-shadow: 0 0 40px rgba(201,168,76,0.9), 0 0 80px rgba(201,168,76,0.4), 0 0 120px rgba(201,168,76,0.15); }
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes starPop {
+            0%   { transform: scale(0) rotate(0deg);   opacity: 0; }
+            60%  { transform: scale(1.3) rotate(20deg); opacity: 1; }
+            100% { transform: scale(1) rotate(15deg);  opacity: 1; }
+        }
+
+        .victory-crown {
+            font-size: 5rem;
+            display: block;
+            animation: crownBounce 1.6s cubic-bezier(0.36,0.07,0.19,0.97) infinite;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 2;
+        }
+        .victory-congrats {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: var(--gold-dim);
+            animation: slideUp 0.6s 0.2s both;
+            position: relative; z-index: 2;
+        }
+        .victory-name {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.6rem;
+            font-weight: 800;
+            color: var(--gold);
+            margin: 8px 0 4px;
+            animation: goldGlow 2s ease-in-out infinite, slideUp 0.6s 0.35s both;
+            position: relative; z-index: 2;
+            line-height: 1.1;
+        }
+        .victory-subtitle {
+            font-size: 1rem;
+            color: var(--text-dim);
+            margin-bottom: 28px;
+            animation: slideUp 0.6s 0.5s both;
+            position: relative; z-index: 2;
+        }
+        .victory-stars {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            font-size: 1.8rem;
+            margin-bottom: 28px;
+            position: relative; z-index: 2;
+        }
+        .victory-stars span {
+            display: inline-block;
+            animation: starPop 0.5s cubic-bezier(0.36,0.07,0.19,0.97) both;
+        }
+        .victory-stars span:nth-child(1) { animation-delay: 0.6s; }
+        .victory-stars span:nth-child(2) { animation-delay: 0.75s; }
+        .victory-stars span:nth-child(3) { animation-delay: 0.9s; }
+        .victory-divider {
+            width: 60px; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+            margin: 0 auto 24px;
+            animation: slideUp 0.6s 0.65s both;
+            position: relative; z-index: 2;
+        }
+        .victory-play-again {
+            width: 100%;
+            background: linear-gradient(135deg, #8a6820, var(--gold));
+            border: none;
+            color: var(--bg);
+            padding: 15px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 800;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            box-shadow: 0 8px 24px rgba(201,168,76,0.3);
+            animation: slideUp 0.6s 0.8s both;
+            position: relative; z-index: 2;
+            letter-spacing: 1px;
+        }
+        .victory-play-again:hover {
+            filter: brightness(1.15);
+            transform: translateY(-3px);
+            box-shadow: 0 14px 32px rgba(201,168,76,0.45);
+        }
+        .victory-dismiss {
+            margin-top: 12px;
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            font-family: 'Nunito', sans-serif;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: color 0.2s;
+            animation: slideUp 0.6s 0.95s both;
+            position: relative; z-index: 2;
+        }
+        .victory-dismiss:hover { color: var(--text); }
+
         /* === RESPONSIVE BREAKPOINTS === */
         @media (min-width: 700px) {
             body { padding: 20px; align-items: center; }
@@ -566,6 +698,24 @@
             </div>
 
             <button id="startBtn" class="btn start-btn"><i class="fa fa-play" style="margin-right:8px;"></i> Start Game</button>
+        </div>
+    </div>
+
+    <!-- VICTORY MODAL -->
+    <div id="victory-modal" class="modal">
+        <div class="modal-content">
+            <canvas id="victory-confetti"></canvas>
+            <span class="victory-crown">👑</span>
+            <div class="victory-congrats">Félicitations !</div>
+            <div class="victory-name" id="victory-winner-name">Player</div>
+            <div class="victory-subtitle">Checkmate — Victory is yours!</div>
+            <div class="victory-stars">
+                <span>⭐</span><span>⭐</span><span>⭐</span>
+            </div>
+            <div class="victory-divider"></div>
+            <button class="victory-play-again" onclick="closeVictoryAndReset()">🔄 Play Again</button>
+            <br>
+            <button class="victory-dismiss" onclick="document.getElementById('victory-modal').classList.remove('active'); stopConfetti();">Continue watching the board</button>
         </div>
     </div>
 
@@ -1095,7 +1245,11 @@
                 st.style.color = 'var(--gold)';
                 cw.classList.remove('active'); cb.classList.remove('active');
 
-                if (!gameOverSaved) { saveMatch(winnerName, loserName, gameMode); gameOverSaved = true; }
+                if (!gameOverSaved) {
+                    saveMatch(winnerName, loserName, gameMode);
+                    gameOverSaved = true;
+                    setTimeout(() => showVictoryModal(winnerName), 600);
+                }
             } else if (game.in_draw() || game.in_stalemate() || game.in_threefold_repetition()) {
                 st.innerHTML = `<i class="fa fa-handshake"></i> Game Drawn.`;
                 st.style.color = 'var(--cream-dim)';
@@ -1368,6 +1522,89 @@
 
         drawBoardBg();
         fullRedraw();
+
+        /** ==========================================
+         *  VICTORY MODAL + CONFETTI
+         *  ========================================== */
+        let confettiAnim = null;
+        const confettiParticles = [];
+
+        const CONFETTI_COLORS = [
+            '#c9a84c','#e8c87a','#fff','#a855f7','#38bdf8','#f472b6','#4ade80'
+        ];
+
+        function showVictoryModal(name) {
+            document.getElementById('victory-winner-name').textContent = name;
+            const modal = document.getElementById('victory-modal');
+            modal.classList.add('active');
+            startConfetti();
+        }
+
+        function closeVictoryAndReset() {
+            document.getElementById('victory-modal').classList.remove('active');
+            stopConfetti();
+            resetGame();
+        }
+
+        function startConfetti() {
+            const canvas = document.getElementById('victory-confetti');
+            const ctx = canvas.getContext('2d');
+            confettiParticles.length = 0;
+
+            function resize() {
+                canvas.width  = canvas.offsetWidth;
+                canvas.height = canvas.offsetHeight;
+            }
+            resize();
+
+            for (let i = 0; i < 90; i++) {
+                confettiParticles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height - canvas.height,
+                    w: Math.random() * 9 + 4,
+                    h: Math.random() * 5 + 3,
+                    color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+                    angle: Math.random() * Math.PI * 2,
+                    spin:  (Math.random() - 0.5) * 0.18,
+                    vy:    Math.random() * 2.5 + 1.2,
+                    vx:    (Math.random() - 0.5) * 1.5,
+                    opacity: Math.random() * 0.5 + 0.5
+                });
+            }
+
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                confettiParticles.forEach(p => {
+                    ctx.save();
+                    ctx.globalAlpha = p.opacity;
+                    ctx.translate(p.x + p.w / 2, p.y + p.h / 2);
+                    ctx.rotate(p.angle);
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+                    ctx.restore();
+
+                    p.y += p.vy;
+                    p.x += p.vx;
+                    p.angle += p.spin;
+                    if (p.y > canvas.height) {
+                        p.y = -p.h;
+                        p.x = Math.random() * canvas.width;
+                    }
+                });
+                confettiAnim = requestAnimationFrame(draw);
+            }
+            if (confettiAnim) cancelAnimationFrame(confettiAnim);
+            draw();
+        }
+
+        function stopConfetti() {
+            if (confettiAnim) {
+                cancelAnimationFrame(confettiAnim);
+                confettiAnim = null;
+            }
+            const canvas = document.getElementById('victory-confetti');
+            if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+        }
     </script>
 <p align="middle"><font color=white size=2>BY FARES GUERMACHE</font></p>
 </body>
